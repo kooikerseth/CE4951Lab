@@ -18,8 +18,10 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include <stdio.h>
+#include <stdlib.h>
 #include "main.h"
-
+#include "uart_driver.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -27,11 +29,15 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#define USE_HAL_TIM_REGISTER_CALLBACKS 1
+enum state { BUSY, IDLE, COLLISION } currentState;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define USE_HAL_TIM_REGISTER_CALLBACKS 1
+#define F_CPU 42000000UL
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -43,7 +49,6 @@
 TIM_HandleTypeDef htim1;
 
 /* USER CODE BEGIN PV */
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -60,10 +65,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim){
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
 
 	if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_9) == GPIO_PIN_RESET){
+		currentState = IDLE;
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET);
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);
 	}else{
+		currentState = COLLISION;
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_SET);
@@ -72,10 +79,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim){
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	if (GPIO_Pin == GPIO_PIN_9){
+		currentState = BUSY;
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);
-		TIM2->CNT = 0;
+		TIM1->CNT = 0;
 	}
 }
 /* USER CODE END 0 */
@@ -111,8 +119,12 @@ int main(void)
   MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim1);
-  /* USER CODE END 2 */
+  init_usart2(57600,F_CPU);
+  printf("Hello\n");
+  char * buffer = malloc(256*sizeof(char));
+  uint16_t * output = malloc(2*256*sizeof(char));
 
+  /* USER CODE END 2 */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -120,6 +132,26 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+	  int readCount = scanf("%s",buffer);
+	  int length = strlen(buffer);
+	  //send data
+	  if (readCount){
+		  printf("read count: %d, buffer: %s\n", length, buffer);
+		  for (int i = 0; i < length;){
+			  for (int j = 0; j < 8; j++){
+				  if (buffer[i] & 0b1<<j)
+					  output[i] = 0b01<<j*2+1;
+				  else
+					  output[i] = 0b10<<j*2-1;
+
+			  }
+		  }
+		  for (int i = 0; i< length*2; i++){
+			  printf("%c", output+i);
+			  printf("%c", output+i+8);
+		  }
+	  }
   }
   /* USER CODE END 3 */
 }
