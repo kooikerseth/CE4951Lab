@@ -20,6 +20,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "main.h"
 #include "uart_driver.h"
 /* Private includes ----------------------------------------------------------*/
@@ -42,7 +43,16 @@ enum state { BUSY, IDLE, COLLISION } currentState;
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  (byte & 0x80 ? '1' : '0'), \
+  (byte & 0x40 ? '1' : '0'), \
+  (byte & 0x20 ? '1' : '0'), \
+  (byte & 0x10 ? '1' : '0'), \
+  (byte & 0x08 ? '1' : '0'), \
+  (byte & 0x04 ? '1' : '0'), \
+  (byte & 0x02 ? '1' : '0'), \
+  (byte & 0x01 ? '1' : '0')
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -138,20 +148,24 @@ int main(void)
 	  //send data
 	  if (readCount){
 		  printf("read count: %d, buffer: %s\n", length, buffer);
-		  for (int i = 0; i < length;){
+		  for (int i = 0; i < length;i++){
+			  printf("Buffer:"BYTE_TO_BINARY_PATTERN "\n",BYTE_TO_BINARY(*(buffer+i)));
+			  output[i] = 0;
 			  for (int j = 0; j < 8; j++){
 				  if (buffer[i] & 0b1<<j)
-					  output[i] = 0b01<<j*2+1;
+					  output[i] |= 0b01<<((j*2));
 				  else
-					  output[i] = 0b10<<j*2-1;
+					  output[i] |= 0b10<<((j*2));
 
 			  }
 		  }
-		  for (int i = 0; i< length*2; i++){
-			  printf("%c", output+i);
-			  printf("%c", output+i+8);
+		  for (int i = 0; i < length;i++){
+				  printf("Manchester:"BYTE_TO_BINARY_PATTERN BYTE_TO_BINARY_PATTERN "\n",
+						  BYTE_TO_BINARY(*(output+i)>>8),BYTE_TO_BINARY(*(output+i)));
 		  }
 	  }
+
+	  //transmit bits on some pin
   }
   /* USER CODE END 3 */
 }
