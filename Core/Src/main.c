@@ -108,6 +108,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim){
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	if (GPIO_Pin == GPIO_PIN_9){
+		if(bitCount == 7)
+			receiveBuffer[byteCount] = 0;
 		if(firstEdge)
 		{
 			TIM2->CNT = 0;
@@ -123,8 +125,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 				// Read bit
 				uint8_t value = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_9);
 				receiveBuffer[byteCount] |= value<<bitCount--;
-				if(bitCount == -1)
+				if(bitCount < 0)
 				{
+					printf("%c", receiveBuffer[byteCount]);
 					byteCount++;
 					bitCount = 7;
 				}
@@ -260,12 +263,12 @@ LOOP_START:
 	  }
 
 	  // Print received message
-	  if(byteCount)
-	  {
-		  fwrite(receiveBuffer, 1, byteCount, stdout);
-		  byteCount = 0;
-		  bitCount = 7;
-	  }
+//	  if(byteCount)
+//	  {
+//		  fwrite(receiveBuffer, 1, byteCount, stdout);
+//		  byteCount = 0;
+//		  bitCount = 7;
+//	  }
 
 
   }
@@ -338,7 +341,7 @@ static void MX_TIM1_Init(void)
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 153;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 1099;
+  htim1.Init.Period = 2399;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -494,7 +497,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 }
