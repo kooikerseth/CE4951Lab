@@ -742,7 +742,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	if (GPIO_Pin == GPIO_PIN_9){
  800079a:	88fb      	ldrh	r3, [r7, #6]
  800079c:	f5b3 7f00 	cmp.w	r3, #512	; 0x200
- 80007a0:	d16f      	bne.n	8000882 <HAL_GPIO_EXTI_Callback+0xf2>
+ 80007a0:	d170      	bne.n	8000884 <HAL_GPIO_EXTI_Callback+0xf4>
 		if(firstEdge)
  80007a2:	4b3a      	ldr	r3, [pc, #232]	; (800088c <HAL_GPIO_EXTI_Callback+0xfc>)
  80007a4:	781b      	ldrb	r3, [r3, #0]
@@ -778,7 +778,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
  80007d8:	b2d1      	uxtb	r1, r2
  80007da:	4a2f      	ldr	r2, [pc, #188]	; (8000898 <HAL_GPIO_EXTI_Callback+0x108>)
  80007dc:	54d1      	strb	r1, [r2, r3]
- 80007de:	e038      	b.n	8000852 <HAL_GPIO_EXTI_Callback+0xc2>
+ 80007de:	e039      	b.n	8000854 <HAL_GPIO_EXTI_Callback+0xc4>
 		}
 		else
 		{
@@ -786,7 +786,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
  80007e0:	f04f 4380 	mov.w	r3, #1073741824	; 0x40000000
  80007e4:	6a5b      	ldr	r3, [r3, #36]	; 0x24
  80007e6:	f5b3 7f16 	cmp.w	r3, #600	; 0x258
- 80007ea:	d932      	bls.n	8000852 <HAL_GPIO_EXTI_Callback+0xc2>
+ 80007ea:	d933      	bls.n	8000854 <HAL_GPIO_EXTI_Callback+0xc4>
 			{
 				TIM2->CNT = 0;
  80007ec:	f04f 4380 	mov.w	r3, #1073741824	; 0x40000000
@@ -799,11 +799,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
  80007fa:	f001 fa97 	bl	8001d2c <HAL_GPIO_ReadPin>
  80007fe:	4603      	mov	r3, r0
  8000800:	73fb      	strb	r3, [r7, #15]
-				receiveBuffer[byteCount] |= value<<bitCount++;
+				receiveBuffer[byteCount] |= value<<bitCount--;
  8000802:	7bfa      	ldrb	r2, [r7, #15]
  8000804:	4b22      	ldr	r3, [pc, #136]	; (8000890 <HAL_GPIO_EXTI_Callback+0x100>)
  8000806:	681b      	ldr	r3, [r3, #0]
- 8000808:	1c59      	adds	r1, r3, #1
+ 8000808:	1e59      	subs	r1, r3, #1
  800080a:	4821      	ldr	r0, [pc, #132]	; (8000890 <HAL_GPIO_EXTI_Callback+0x100>)
  800080c:	6001      	str	r1, [r0, #0]
  800080e:	fa02 f103 	lsl.w	r1, r2, r3
@@ -820,66 +820,65 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
  8000826:	b2d1      	uxtb	r1, r2
  8000828:	4a1b      	ldr	r2, [pc, #108]	; (8000898 <HAL_GPIO_EXTI_Callback+0x108>)
  800082a:	54d1      	strb	r1, [r2, r3]
-				if(bitCount == 8)
+				if(bitCount == -1)
  800082c:	4b18      	ldr	r3, [pc, #96]	; (8000890 <HAL_GPIO_EXTI_Callback+0x100>)
  800082e:	681b      	ldr	r3, [r3, #0]
- 8000830:	2b08      	cmp	r3, #8
- 8000832:	d107      	bne.n	8000844 <HAL_GPIO_EXTI_Callback+0xb4>
+ 8000830:	f1b3 3fff 	cmp.w	r3, #4294967295
+ 8000834:	d107      	bne.n	8000846 <HAL_GPIO_EXTI_Callback+0xb6>
 				{
 					byteCount++;
- 8000834:	4b17      	ldr	r3, [pc, #92]	; (8000894 <HAL_GPIO_EXTI_Callback+0x104>)
- 8000836:	681b      	ldr	r3, [r3, #0]
- 8000838:	3301      	adds	r3, #1
- 800083a:	4a16      	ldr	r2, [pc, #88]	; (8000894 <HAL_GPIO_EXTI_Callback+0x104>)
- 800083c:	6013      	str	r3, [r2, #0]
-					bitCount = 0;
- 800083e:	4b14      	ldr	r3, [pc, #80]	; (8000890 <HAL_GPIO_EXTI_Callback+0x100>)
- 8000840:	2200      	movs	r2, #0
- 8000842:	601a      	str	r2, [r3, #0]
+ 8000836:	4b17      	ldr	r3, [pc, #92]	; (8000894 <HAL_GPIO_EXTI_Callback+0x104>)
+ 8000838:	681b      	ldr	r3, [r3, #0]
+ 800083a:	3301      	adds	r3, #1
+ 800083c:	4a15      	ldr	r2, [pc, #84]	; (8000894 <HAL_GPIO_EXTI_Callback+0x104>)
+ 800083e:	6013      	str	r3, [r2, #0]
+					bitCount = 7;
+ 8000840:	4b13      	ldr	r3, [pc, #76]	; (8000890 <HAL_GPIO_EXTI_Callback+0x100>)
+ 8000842:	2207      	movs	r2, #7
+ 8000844:	601a      	str	r2, [r3, #0]
 				}
 				if(byteCount == 30)
- 8000844:	4b13      	ldr	r3, [pc, #76]	; (8000894 <HAL_GPIO_EXTI_Callback+0x104>)
- 8000846:	681b      	ldr	r3, [r3, #0]
- 8000848:	2b1e      	cmp	r3, #30
- 800084a:	d102      	bne.n	8000852 <HAL_GPIO_EXTI_Callback+0xc2>
+ 8000846:	4b13      	ldr	r3, [pc, #76]	; (8000894 <HAL_GPIO_EXTI_Callback+0x104>)
+ 8000848:	681b      	ldr	r3, [r3, #0]
+ 800084a:	2b1e      	cmp	r3, #30
+ 800084c:	d102      	bne.n	8000854 <HAL_GPIO_EXTI_Callback+0xc4>
 					byteCount = 0;
- 800084c:	4b11      	ldr	r3, [pc, #68]	; (8000894 <HAL_GPIO_EXTI_Callback+0x104>)
- 800084e:	2200      	movs	r2, #0
- 8000850:	601a      	str	r2, [r3, #0]
+ 800084e:	4b11      	ldr	r3, [pc, #68]	; (8000894 <HAL_GPIO_EXTI_Callback+0x104>)
+ 8000850:	2200      	movs	r2, #0
+ 8000852:	601a      	str	r2, [r3, #0]
 			}
 
 		}
 		currentState = BUSY;
- 8000852:	4b13      	ldr	r3, [pc, #76]	; (80008a0 <HAL_GPIO_EXTI_Callback+0x110>)
- 8000854:	2200      	movs	r2, #0
- 8000856:	701a      	strb	r2, [r3, #0]
+ 8000854:	4b12      	ldr	r3, [pc, #72]	; (80008a0 <HAL_GPIO_EXTI_Callback+0x110>)
+ 8000856:	2200      	movs	r2, #0
+ 8000858:	701a      	strb	r2, [r3, #0]
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET);
- 8000858:	2200      	movs	r2, #0
- 800085a:	f44f 5100 	mov.w	r1, #8192	; 0x2000
- 800085e:	4811      	ldr	r0, [pc, #68]	; (80008a4 <HAL_GPIO_EXTI_Callback+0x114>)
- 8000860:	f001 fa7c 	bl	8001d5c <HAL_GPIO_WritePin>
+ 800085a:	2200      	movs	r2, #0
+ 800085c:	f44f 5100 	mov.w	r1, #8192	; 0x2000
+ 8000860:	4810      	ldr	r0, [pc, #64]	; (80008a4 <HAL_GPIO_EXTI_Callback+0x114>)
+ 8000862:	f001 fa7b 	bl	8001d5c <HAL_GPIO_WritePin>
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
- 8000864:	2201      	movs	r2, #1
- 8000866:	f44f 4180 	mov.w	r1, #16384	; 0x4000
- 800086a:	480e      	ldr	r0, [pc, #56]	; (80008a4 <HAL_GPIO_EXTI_Callback+0x114>)
- 800086c:	f001 fa76 	bl	8001d5c <HAL_GPIO_WritePin>
+ 8000866:	2201      	movs	r2, #1
+ 8000868:	f44f 4180 	mov.w	r1, #16384	; 0x4000
+ 800086c:	480d      	ldr	r0, [pc, #52]	; (80008a4 <HAL_GPIO_EXTI_Callback+0x114>)
+ 800086e:	f001 fa75 	bl	8001d5c <HAL_GPIO_WritePin>
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);
- 8000870:	2200      	movs	r2, #0
- 8000872:	f44f 4100 	mov.w	r1, #32768	; 0x8000
- 8000876:	480b      	ldr	r0, [pc, #44]	; (80008a4 <HAL_GPIO_EXTI_Callback+0x114>)
- 8000878:	f001 fa70 	bl	8001d5c <HAL_GPIO_WritePin>
+ 8000872:	2200      	movs	r2, #0
+ 8000874:	f44f 4100 	mov.w	r1, #32768	; 0x8000
+ 8000878:	480a      	ldr	r0, [pc, #40]	; (80008a4 <HAL_GPIO_EXTI_Callback+0x114>)
+ 800087a:	f001 fa6f 	bl	8001d5c <HAL_GPIO_WritePin>
 		TIM1->CNT = 0;
- 800087c:	4b0a      	ldr	r3, [pc, #40]	; (80008a8 <HAL_GPIO_EXTI_Callback+0x118>)
- 800087e:	2200      	movs	r2, #0
- 8000880:	625a      	str	r2, [r3, #36]	; 0x24
+ 800087e:	4b0a      	ldr	r3, [pc, #40]	; (80008a8 <HAL_GPIO_EXTI_Callback+0x118>)
+ 8000880:	2200      	movs	r2, #0
+ 8000882:	625a      	str	r2, [r3, #36]	; 0x24
 
 	}
 }
- 8000882:	bf00      	nop
- 8000884:	3710      	adds	r7, #16
- 8000886:	46bd      	mov	sp, r7
- 8000888:	bd80      	pop	{r7, pc}
- 800088a:	bf00      	nop
+ 8000884:	bf00      	nop
+ 8000886:	3710      	adds	r7, #16
+ 8000888:	46bd      	mov	sp, r7
+ 800088a:	bd80      	pop	{r7, pc}
  800088c:	20000000 	.word	0x20000000
  8000890:	20000004 	.word	0x20000004
  8000894:	20000094 	.word	0x20000094

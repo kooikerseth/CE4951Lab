@@ -69,7 +69,7 @@ int wait_trans,output_L;
 uint8_t firstEdge = 1;
 uint8_t receiveBuffer[30];
 unsigned int byteCount = 0;
-unsigned int bitCount = 7;
+int bitCount = 7;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -122,11 +122,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 				TIM2->CNT = 0;
 				// Read bit
 				uint8_t value = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_9);
-				receiveBuffer[byteCount] |= value<<bitCount++;
-				if(bitCount == 8)
+				receiveBuffer[byteCount] |= value<<bitCount--;
+				if(bitCount == -1)
 				{
 					byteCount++;
-					bitCount = 0;
+					bitCount = 7;
 				}
 				if(byteCount == 30)
 					byteCount = 0;
