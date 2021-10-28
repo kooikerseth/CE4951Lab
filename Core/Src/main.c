@@ -173,7 +173,7 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim2);
 
   uart_init(57600,F_CPU);
-  printf("Hello\n");
+  //printf("Hello\n");
 
   uint8_t endTransmitData = 0;
   int readCount = 0;
@@ -249,6 +249,7 @@ LOOP_START:
 
 //		  output_L = length*16;
 //		  printf("bits To Send: %d \n", output_L);
+		  HAL_NVIC_SystemReset();
 
 	  }
 
