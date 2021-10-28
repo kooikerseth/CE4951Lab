@@ -61,8 +61,8 @@ all: main-build
 main-build: CE4951Lab.elf secondary-outputs
 
 # Tool invocations
-CE4951Lab.elf: $(OBJS) $(USER_OBJS) C:\Users\primeaum\Box\CE4951\Lab\ Project\CE4951Lab\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "CE4951Lab.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\primeaum\Box\CE4951\Lab Project\CE4951Lab\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="CE4951Lab.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+CE4951Lab.elf: $(OBJS) $(USER_OBJS) C:\Users\seth\Documents\CE4951_CubeIDE\CE4951Lab\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "CE4951Lab.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\seth\Documents\CE4951_CubeIDE\CE4951Lab\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="CE4951Lab.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

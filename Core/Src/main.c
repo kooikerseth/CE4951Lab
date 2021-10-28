@@ -108,39 +108,29 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim){
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	if (GPIO_Pin == GPIO_PIN_9){
-		if(bitCount == 7)
-			receiveBuffer[byteCount] = 0;
-		if(firstEdge)
-		{
+		if(TIM2->SR & TIM_SR_UIF){
 			TIM2->CNT = 0;
-			firstEdge = 0;
-			// Read logic-0
-			receiveBuffer[byteCount] |= 0b0<<bitCount--;
-		}
-		else
-		{
-			if(TIM2->CNT > 600) // This is a clock synchronization edge
+			TIM2->SR &= ~TIM_SR_UIF;
+			uint8_t value = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_9);
+			if (bitCount ==7) {receiveBuffer[byteCount] = 0;}
+			receiveBuffer[byteCount] |= value<<bitCount--;
+
+			if(bitCount < 0)
 			{
-				TIM2->CNT = 0;
-				// Read bit
-				uint8_t value = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_9);
-				receiveBuffer[byteCount] |= value<<bitCount--;
-				if(bitCount < 0)
-				{
-					printf("%c", receiveBuffer[byteCount]);
-					byteCount++;
-					bitCount = 7;
-				}
-				if(byteCount == 30)
-					byteCount = 0;
+				//printf("%c", receiveBuffer[byteCount]);
+				byteCount++;
+				bitCount = 7;
 			}
+			if(byteCount == 30)
+				byteCount = 0;
+
+			currentState = BUSY;
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);
+			TIM1->CNT = 0;
 
 		}
-		currentState = BUSY;
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);
-		TIM1->CNT = 0;
 
 	}
 }
@@ -263,12 +253,12 @@ LOOP_START:
 	  }
 
 	  // Print received message
-//	  if(byteCount)
-//	  {
-//		  fwrite(receiveBuffer, 1, byteCount, stdout);
-//		  byteCount = 0;
-//		  bitCount = 7;
-//	  }
+	  if(byteCount)
+	  {
+		  fwrite(receiveBuffer, 1, byteCount, stdout);
+		  byteCount = 0;
+		  bitCount = 7;
+	  }
 
 
   }
@@ -387,7 +377,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 153;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 1100;
+  htim2.Init.Period = 550;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -399,7 +389,7 @@ static void MX_TIM2_Init(void)
   {
     Error_Handler();
   }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
   {
