@@ -222,9 +222,9 @@ LOOP_START:
 	  if (endTransmitData){
 		  endTransmitData = 0;
 		  readCount = 0;
-		  printf("read count: %d, buffer: %s\n", length, buffer);
+//		  printf("read count: %d, buffer: %s\n", length, buffer);
 		  for (int i = 0; i < length;i++){
-			  printf("Buffer:"BYTE_TO_BINARY_PATTERN "\n",BYTE_TO_BINARY(*(buffer+i)));
+//			  printf("Buffer:"BYTE_TO_BINARY_PATTERN "\n",BYTE_TO_BINARY(*(buffer+i)));
 			  output[i] = 0;
 			  for (int j = 0; j < 8; j++){
 				  if (buffer[i] & 0b1<<j)
@@ -234,10 +234,10 @@ LOOP_START:
 
 			  }
 		  }
-		  for (int i = 0; i < length;i++){
-				  printf("Man:"BYTE_TO_BINARY_PATTERN BYTE_TO_BINARY_PATTERN "\n",
-						  BYTE_TO_BINARY(output[i]>>8),BYTE_TO_BINARY(output[i]));
-		  }
+//		  for (int i = 0; i < length;i++){
+//				  printf("Man:"BYTE_TO_BINARY_PATTERN BYTE_TO_BINARY_PATTERN "\n",
+//						  BYTE_TO_BINARY(output[i]>>8),BYTE_TO_BINARY(output[i]));
+//		  }
 		  while (currentState == COLLISION || currentState == BUSY);
 		  currentState = BUSY;
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET);
