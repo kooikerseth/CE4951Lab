@@ -113,7 +113,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 			TIM2->CNT = 0;
 			firstEdge = 0;
 			// Read logic-0
-			receiveBuffer[byteCount] |= 0b0<<bitCount++;
+			receiveBuffer[byteCount] |= 0b0<<bitCount--;
 		}
 		else
 		{
@@ -184,6 +184,7 @@ int main(void)
 
   uint8_t endTransmitData = 0;
   int readCount = 0;
+
 
   /* USER CODE END 2 */
 
@@ -259,14 +260,11 @@ LOOP_START:
 	  }
 
 	  // Print received message
-	  if(byteCount && currentState != BUSY)
+	  if(byteCount)
 	  {
-		  for(int i = 0; i < byteCount; i++)
-		  {
-			  printf("%c", receiveBuffer[i]);
-		  }
-		  printf("\n");
+		  fwrite(receiveBuffer, 1, byteCount, stdout);
 		  byteCount = 0;
+		  bitCount = 7;
 	  }
 
 
@@ -431,7 +429,7 @@ static void MX_TIM8_Init(void)
   htim8.Instance = TIM8;
   htim8.Init.Prescaler = 153;
   htim8.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim8.Init.Period = 499;
+  htim8.Init.Period = 553;
   htim8.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim8.Init.RepetitionCounter = 0;
   htim8.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
