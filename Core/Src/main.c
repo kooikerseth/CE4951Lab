@@ -61,7 +61,7 @@ enum state { BUSY, IDLE, COLLISION } currentState;
 #define IDLE_S \
 		currentState = IDLE; \
 		GPIOB->BSRR |= GPIO_PIN_15 & ((GPIO_PIN_13 & GPIO_PIN_14)<<16UL); \
-		bitCount = 0; byteCount = 0
+		bitCount = 7; byteCount = 0
 #define COLLISION_S \
 		currentState = COLLISION; \
 		GPIOB->BSRR |= GPIO_PIN_13 & ((GPIO_PIN_14 & GPIO_PIN_15)<<16UL)
@@ -105,9 +105,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim){
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	if (GPIO_Pin == GPIO_PIN_9){
+
 		if(TIM2->SR & TIM_SR_UIF){
 			TIM2->CNT = 0;
 			TIM2->SR &= ~TIM_SR_UIF;
+
 			uint8_t value = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_9);
 			if (bitCount ==7) {receiveBuffer[byteCount] = 0;}
 			receiveBuffer[byteCount] |= value<<bitCount--;
@@ -138,6 +140,7 @@ void sendData(int bytes){
 			  output[i] |= 0b10<<((j*2));
 	  }
 	}
+
 	while (currentState == COLLISION || currentState == BUSY);
 	BUSY_S;
 	for (int i = 0; i < bytes;i++){
@@ -213,7 +216,7 @@ int main(void)
 	  //Print received message
 	  if(byteCount)
 	  {
-		  fwrite(receiveBuffer, 1, byteCount+1, stdout);
+		  fwrite(receiveBuffer, 1, byteCount, stdout);
 		  byteCount = 0;
 		  bitCount = 7;
 	  }
