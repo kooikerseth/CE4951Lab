@@ -11,3 +11,9 @@
  * @param sysclk - the frequency of the system clock in Hz
  */
 void uart_init(int baud, int sysclk);
+int uart_isempty();
+char uart_getc();
+/**
+ * USART2 interrupt request handler
+ */
+void USART2_IRQHandler(void);
