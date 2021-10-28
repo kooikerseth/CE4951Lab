@@ -1,92 +1,174 @@
-/*
- * uart_driver.c
- *
- *  Created on: Nov 8, 2016
- *      Author: barnekow
+/**
+ * @file: uart_driver.c
+ * @author: Grant Wilk
+ * @modified: 2/4/2020
+ * @description: a UART driver for the MCU's USART2 module
+*/
+
+# include <stdio.h>
+# include "uart_driver.h"
+# include "circular_queue.h"
+# include "stm32f446xx.h"
+
+/**
+ * Stores characters after they are read from the RDR
  */
-#include "uart_driver.h"
-#include <inttypes.h>
-#include <stdio.h>
+static circular_queue input_buffer;
 
 
-// These will override _read and _write in syscalls.c, which are
-// prototyped as weak
-int _read(int file, char *ptr, int len)
+/**
+ * Stores characters until they are transmitted by the TDR
+ */
+static circular_queue output_buffer;
+
+/**
+ * Initializes USART2 as a UART
+ * @param baud - the baud rate
+ * @param sysclk - the frequency of the system clock in Hz
+ */
+void uart_init(int baud, int sysclk) {
+
+    // define the input and output buffer
+    input_buffer = cq_init();
+    output_buffer = cq_init();
+
+    // enable GPIOA in RCC
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+
+    // enable USART2 in RCC
+    RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
+
+    // set PA2 and PA3 as pullup
+    GPIOA->PUPDR |= (0b01 << GPIO_PUPDR_PUPD2_Pos | 0b01 << GPIO_PUPDR_PUPD3_Pos);
+
+    // clear PA2 and PA3 mode
+    GPIOA->MODER &= ~(GPIO_MODER_MODER2 | GPIO_MODER_MODER3);
+
+    // set PA2 and PA3 mode to alternate function
+    GPIOA->MODER |= (0b10 << GPIO_MODER_MODER2_Pos | 0b10 << GPIO_MODER_MODER3_Pos);
+
+    // clear alternate function select for PA2 and PA3
+    GPIOA->AFR[0] &= ~(GPIO_AFRL_AFRL2 | GPIO_AFRL_AFRL3);
+
+    // select USART1..3 (AF7) as the alternate function for PA3 and PA2
+    GPIOA->AFR[0] |= (7 << GPIO_AFRL_AFSEL2_Pos | 7 << GPIO_AFRL_AFSEL3_Pos);
+
+    // set USART2's baud rate
+    USART2->BRR = sysclk / baud;
+
+    // enable USART2's UART, RX, and TX
+    USART2->CR1 |= (USART_CR1_UE | USART_CR1_TE | USART_CR1_RE);
+
+    // enable USART2's TXE interrupt and RXNE interrupt
+    USART2->CR1 |= (USART_CR1_TXEIE | USART_CR1_RXNEIE);
+
+    // enable USART2 interrupts in NVIC
+    NVIC->ISER[1] |= (1 << 6);
+
+    // set output buffer source
+    setvbuf(stdout, NULL, _IONBF, 0);
+
+}
+
+/**
+ * Reads a string from the UART's input buffer
+ * @param file - not implemented (ignored)
+ * @param ptr - where the read data should be put
+ * @param len - the number of characters to read
+ * @return the number of characters read
+ */
+int _read(int file, char * ptr, int len) {
+
+    // wait until the input buffer receives some data
+    while (cq_isempty(&input_buffer));
+
+    int char_count = 0;
+
+    // pull from the circular queue until it is empty
+    while (!cq_isempty(&input_buffer)) {
+        char_count++;
+        *ptr = cq_pull(&input_buffer);
+        ptr++;
+    }
+
+    if (*ptr == '\r') *ptr = '\n';
+
+    return char_count;
+
+}
+
+/**
+ * Writes a string to the UART's output buffer
+ * @param file - not implemented (ignored)
+ * @param ptr - where the characters should be read from
+ * @param len - the number of characters to read
+ * @return the number of characters read
+ */
+int _write(int file, char * ptr, int len) {
+
+    int char_count = 0;
+
+    // push characters to the output buffer until we write len characters or the buffer fills up
+    while (char_count < len && !cq_isfull(&output_buffer)) {
+        cq_push(&output_buffer, *ptr);
+        char_count++;
+        ptr++;
+    }
+
+    // enable TXE interrupts so the data can be transmitted
+    USART2->CR1 |= USART_CR1_TXEIE;
+
+    return char_count;
+}
+
+int uart_isempty()
 {
-	int DataIdx;
-	// Modified the for loop in order to get the correct behavior for fgets
-	int byteCnt = 0;
-	for (DataIdx = 0; DataIdx < len; DataIdx++)
-	{
-		//*ptr++ = __io_getchar();
-		byteCnt++;
-		//*ptr++ = usart2_getch();
-		*ptr = usart2_getch();
-		if(*ptr == '\n') break;
-		ptr++;
-	}
-
-	//return len;
-	return byteCnt; // Return byte count
+	return cq_isempty(&input_buffer);
 }
 
-int _write(int file, char *ptr, int len)
+char uart_getc()
 {
-	int DataIdx;
-
-	for (DataIdx = 0; DataIdx < len; DataIdx++)
-	{
-		usart2_putch(*ptr++);
-	}
-	return len;
+	return cq_pull(&input_buffer);
 }
 
+/**
+ * USART2 interrupt request handler
+ */
+void USART2_IRQHandler(void) {
 
+    // if the RDR has received data and the input buffer is not full
+    if ((USART2->SR & USART_SR_RXNE) && !cq_isfull(&input_buffer)) {
 
-char usart2_getch(){
-	char c;
-	while((*(USART_SR)&(1<<RXNE)) != (1<<RXNE));
-	c = ((char) *USART_DR);  // Read character from usart
-	usart2_putch(c);  // Echo back
+        // read the RDR
+        char c = USART2->DR;
 
-	if (c == '\r'){  // If character is CR
-		usart2_putch('\n');  // send it
-		c = '\n';   // Return LF. fgets is terminated by LF
-	}
+        // push the char in the RDR into the input buffer
+        cq_push(&input_buffer, c);
 
-	return c;
+        // echo the character to the output buffer
+        if (!cq_isfull(&output_buffer)) {
+            cq_push(&output_buffer, c);
+        }
+
+        // enable TXE interrupts so the echo can be pushed
+        USART2->CR1 |= USART_CR1_TXEIE;
+
+    }
+
+    // if the TDR has completed transmission
+    else if (USART2->SR & USART_SR_TXE) {
+
+        // if the output buffer is not empty
+        if (!cq_isempty(&output_buffer)) {
+
+            // pull a char out of the output buffer and move it into the TDR
+            USART2->DR = cq_pull(&output_buffer);
+
+        } else {
+
+            // disable TXE interrupts
+            USART2->CR1 &= ~(USART_CR1_TXEIE);
+
+        }
+    }
 }
-
-void usart2_putch(char c){
-	while((*(USART_SR)&(1<<TXE)) != (1<<TXE));
-	*(USART_DR) = c;
-}
-
-void init_usart2(uint32_t baud, uint32_t sysclk){
-	// Enable clocks for GPIOA and USART2
-	*(RCC_AHB1ENR) |= (1<<GPIOAEN);
-	*(RCC_APB1ENR) |= (1<<USART2EN);
-
-	// Function 7 of PORTA pins is USART
-	*(GPIOA_AFRL) &= (0xFFFF00FF); // Clear the bits associated with PA3 and PA2
-	*(GPIOA_AFRL) |= (0b01110111<<8);  // Choose function 7 for both PA3 and PA2
-	*(GPIOA_MODER) &= (0xFFFFFF0F);  // Clear mode bits for PA3 and PA2
-	*(GPIOA_MODER) |= (0b1010<<4);  // Both PA3 and PA2 in alt function mode
-
-	// Set up USART2
-	//USART2_init();  //8n1 no flow control
-	// over8 = 0..oversample by 16
-	// M = 0..1 start bit, data size is 8, 1 stop bit
-	// PCE= 0..Parity check not enabled
-	// no interrupts... using polling
-	*(USART_CR1) = (1<<UE)|(1<<TE)|(1<<RE); // Enable UART, Tx and Rx
-	*(USART_CR2) = 0;  // This is the default, but do it anyway
-	*(USART_CR3) = 0;  // This is the default, but do it anyway
-	*(USART_BRR) = sysclk/baud;
-
-	/* I'm not sure if this is needed for standard IO*/
-	 //setvbuf(stderr, NULL, _IONBF, 0);
-	 //setvbuf(stdin, NULL, _IONBF, 0);
-	 setvbuf(stdout, NULL, _IONBF, 0);
-}
-

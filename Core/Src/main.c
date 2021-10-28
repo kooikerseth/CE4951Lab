@@ -59,12 +59,17 @@ enum state { BUSY, IDLE, COLLISION } currentState;
 
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim8;
 
 /* USER CODE BEGIN PV */
 char buffer[256] ;
 uint16_t output[256];
 int wait_trans,output_L;
+uint8_t firstEdge = 1;
+uint8_t receiveBuffer[30];
+unsigned int byteCount = 0;
+unsigned int bitCount = 7;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -72,6 +77,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM8_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -89,6 +95,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim){
 			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);
 		}else{
 			currentState = IDLE;
+			firstEdge = 1;
 			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET);
 			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);
 			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_SET);
@@ -101,11 +108,37 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim){
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	if (GPIO_Pin == GPIO_PIN_9){
+		if(firstEdge)
+		{
+			TIM2->CNT = 0;
+			firstEdge = 0;
+			// Read logic-0
+			receiveBuffer[byteCount] |= 0b0<<bitCount++;
+		}
+		else
+		{
+			if(TIM2->CNT > 600) // This is a clock synchronization edge
+			{
+				TIM2->CNT = 0;
+				// Read bit
+				uint8_t value = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_9);
+				receiveBuffer[byteCount] |= value<<bitCount++;
+				if(bitCount == 8)
+				{
+					byteCount++;
+					bitCount = 0;
+				}
+				if(byteCount == 30)
+					byteCount = 0;
+			}
+
+		}
 		currentState = BUSY;
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);
 		TIM1->CNT = 0;
+
 	}
 }
 /* USER CODE END 0 */
@@ -140,12 +173,17 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM1_Init();
   MX_TIM8_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim1);
   HAL_TIM_Base_Start_IT(&htim8);
+  HAL_TIM_Base_Start_IT(&htim2);
 
-  init_usart2(57600,F_CPU);
+  uart_init(57600,F_CPU);
   printf("Hello\n");
+
+  uint8_t endTransmitData = 0;
+  int readCount = 0;
 
   /* USER CODE END 2 */
 
@@ -159,14 +197,30 @@ int main(void)
 LOOP_START:
 	  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8,GPIO_PIN_SET);
 
-//	  int readCount = scanf("%s",buffer);
-	  int readCount = 1;
-	  buffer[0] = 0xFF;
-	  buffer[1] = 0x00;
-	  int length = strlen(buffer);
+	  //int readCount = scanf("%s",buffer);
+	  char c;
 
+	  if(!uart_isempty())
+	  {
+		  c = uart_getc();
+		  if(c == '\r')
+		  {
+			  endTransmitData = 1;
+			  buffer[readCount] = 0;
+		  }
+		  else
+		  {
+			  buffer[readCount++] = c;
+		  }
+	  }
+	  //int readCount = 1;
+	  //buffer[0] = 0xFF;
+	  //buffer[1] = 0x00;
+	  int length = readCount;
 	  //send data
-	  if (readCount){
+	  if (endTransmitData){
+		  endTransmitData = 0;
+		  readCount = 0;
 		  printf("read count: %d, buffer: %s\n", length, buffer);
 		  for (int i = 0; i < length;i++){
 			  printf("Buffer:"BYTE_TO_BINARY_PATTERN "\n",BYTE_TO_BINARY(*(buffer+i)));
@@ -202,6 +256,17 @@ LOOP_START:
 //		  output_L = length*16;
 //		  printf("bits To Send: %d \n", output_L);
 
+	  }
+
+	  // Print received message
+	  if(byteCount && currentState != BUSY)
+	  {
+		  for(int i = 0; i < byteCount; i++)
+		  {
+			  printf("%c", receiveBuffer[i]);
+		  }
+		  printf("\n");
+		  byteCount = 0;
 	  }
 
 
@@ -301,6 +366,51 @@ static void MX_TIM1_Init(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 153;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 1100;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
   * @brief TIM8 Initialization Function
   * @param None
   * @retval None
@@ -321,7 +431,7 @@ static void MX_TIM8_Init(void)
   htim8.Instance = TIM8;
   htim8.Init.Prescaler = 153;
   htim8.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim8.Init.Period = 553;
+  htim8.Init.Period = 499;
   htim8.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim8.Init.RepetitionCounter = 0;
   htim8.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;

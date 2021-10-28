@@ -5,6 +5,7 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
+../Core/Src/circular_queue.c \
 ../Core/Src/main.c \
 ../Core/Src/stm32f4xx_hal_msp.c \
 ../Core/Src/stm32f4xx_it.c \
@@ -14,6 +15,7 @@ C_SRCS += \
 ../Core/Src/uart_driver.c 
 
 OBJS += \
+./Core/Src/circular_queue.o \
 ./Core/Src/main.o \
 ./Core/Src/stm32f4xx_hal_msp.o \
 ./Core/Src/stm32f4xx_it.o \
@@ -23,6 +25,7 @@ OBJS += \
 ./Core/Src/uart_driver.o 
 
 C_DEPS += \
+./Core/Src/circular_queue.d \
 ./Core/Src/main.d \
 ./Core/Src/stm32f4xx_hal_msp.d \
 ./Core/Src/stm32f4xx_it.d \
