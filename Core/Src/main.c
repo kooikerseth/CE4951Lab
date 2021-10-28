@@ -53,7 +53,18 @@ enum state { BUSY, IDLE, COLLISION } currentState;
   (byte & 0x04 ? '1' : '0'), \
   (byte & 0x02 ? '1' : '0'), \
   (byte & 0x01 ? '1' : '0')
-#define DELAY_500MS wait_trans = 1; while (wait_trans == 1);
+
+
+#define BUSY_S \
+		currentState = BUSY; \
+		GPIOB->BSRR |= GPIO_PIN_14 & ((GPIO_PIN_13 & GPIO_PIN_15)<<16UL)
+#define IDLE_S \
+		currentState = IDLE; \
+		GPIOB->BSRR |= GPIO_PIN_15 & ((GPIO_PIN_13 & GPIO_PIN_14)<<16UL); \
+		bitCount = 7; byteCount = 0
+#define COLLISION_S \
+		currentState = COLLISION; \
+		GPIOB->BSRR |= GPIO_PIN_13 & ((GPIO_PIN_14 & GPIO_PIN_15)<<16UL)
 
 /* USER CODE END PM */
 
@@ -65,8 +76,6 @@ TIM_HandleTypeDef htim8;
 /* USER CODE BEGIN PV */
 char buffer[256] ;
 uint16_t output[256];
-int wait_trans,output_L;
-uint8_t firstEdge = 1;
 uint8_t receiveBuffer[30];
 unsigned int byteCount = 0;
 int bitCount = 7;
@@ -86,54 +95,67 @@ static void MX_TIM2_Init(void);
 /* USER CODE BEGIN 0 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim){
 	if (htim->Instance == TIM1){
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
-
 		if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_9) == GPIO_PIN_RESET){
-			currentState = COLLISION;
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_SET);
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);
+			COLLISION_S;
 		}else{
-			currentState = IDLE;
-			firstEdge = 1;
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_SET);
+			IDLE_S;
 		}
-	}
-	else if (htim->Instance == TIM8){
-		wait_trans = 0;
 	}
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	if (GPIO_Pin == GPIO_PIN_9){
+
 		if(TIM2->SR & TIM_SR_UIF){
 			TIM2->CNT = 0;
 			TIM2->SR &= ~TIM_SR_UIF;
+
 			uint8_t value = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_9);
 			if (bitCount ==7) {receiveBuffer[byteCount] = 0;}
 			receiveBuffer[byteCount] |= value<<bitCount--;
 
 			if(bitCount < 0)
 			{
-				//printf("%c", receiveBuffer[byteCount]);
 				byteCount++;
 				bitCount = 7;
 			}
 			if(byteCount == 30)
 				byteCount = 0;
 
-			currentState = BUSY;
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);
+			BUSY_S;
 			TIM1->CNT = 0;
-
 		}
-
 	}
 }
+
+void sendData(int bytes){
+	//send data
+	buffer[bytes] = 0;
+	for (int i = 0; i < bytes;i++){
+	  output[i] = 0;
+	  for (int j = 0; j < 8; j++){
+		  if (buffer[i] & 0b1<<j)
+			  output[i] |= 0b01<<((j*2));
+		  else
+			  output[i] |= 0b10<<((j*2));
+	  }
+	}
+
+	while (currentState == COLLISION || currentState == BUSY);
+	BUSY_S;
+	for (int i = 0; i < bytes;i++){
+		for (int j = 15; j >= 0; j--){
+			if (currentState == COLLISION)
+				return;
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, (output[i] & 1<<j)? GPIO_PIN_SET:GPIO_PIN_RESET);
+			TIM1->CNT = 0;
+			TIM8->SR &= ~TIM_SR_UIF;
+			while(!(TIM8->SR & TIM_SR_UIF));
+		}
+	}
+}
+
+
 /* USER CODE END 0 */
 
 /**
@@ -143,7 +165,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -152,14 +173,12 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
   /* USER CODE END Init */
 
   /* Configure the system clock */
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -171,89 +190,30 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim1);
   HAL_TIM_Base_Start_IT(&htim8);
   HAL_TIM_Base_Start_IT(&htim2);
-
   uart_init(57600,F_CPU);
-  //printf("Hello\n");
-
-  uint8_t endTransmitData = 0;
   int readCount = 0;
-
-
+  char c;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  printf("Hello\n");
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8,GPIO_PIN_SET);
+  bitCount = 7;
   while (1)
   {
-    /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
-LOOP_START:
-	  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8,GPIO_PIN_SET);
-
-	  //int readCount = scanf("%s",buffer);
-	  char c;
-
+	  //Poll for message
 	  if(!uart_isempty())
 	  {
 		  c = uart_getc();
 		  if(c == '\r')
-		  {
-			  endTransmitData = 1;
-			  buffer[readCount] = 0;
-		  }
+			  sendData(readCount);
 		  else
-		  {
 			  buffer[readCount++] = c;
-		  }
-	  }
-	  //int readCount = 1;
-	  //buffer[0] = 0xFF;
-	  //buffer[1] = 0x00;
-	  int length = readCount;
-	  //send data
-	  if (endTransmitData){
-		  endTransmitData = 0;
-		  readCount = 0;
-//		  printf("read count: %d, buffer: %s\n", length, buffer);
-		  for (int i = 0; i < length;i++){
-//			  printf("Buffer:"BYTE_TO_BINARY_PATTERN "\n",BYTE_TO_BINARY(*(buffer+i)));
-			  output[i] = 0;
-			  for (int j = 0; j < 8; j++){
-				  if (buffer[i] & 0b1<<j)
-					  output[i] |= 0b01<<((j*2));
-				  else
-					  output[i] |= 0b10<<((j*2));
-
-			  }
-		  }
-//		  for (int i = 0; i < length;i++){
-//				  printf("Man:"BYTE_TO_BINARY_PATTERN BYTE_TO_BINARY_PATTERN "\n",
-//						  BYTE_TO_BINARY(output[i]>>8),BYTE_TO_BINARY(output[i]));
-//		  }
-		  while (currentState == COLLISION || currentState == BUSY);
-		  currentState = BUSY;
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_13, GPIO_PIN_RESET);
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);
-			  for (int i = 0; i < length;i++){
-				  for (int j = 15; j >= 0; j--){
-					  if (currentState == COLLISION)
-						  goto LOOP_START;
-					  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, (output[i] & 1<<j)? GPIO_PIN_SET:GPIO_PIN_RESET);
-					  TIM1->CNT = 0;
-					  DELAY_500MS
-				  }
-			  }
-
-
-//		  output_L = length*16;
-//		  printf("bits To Send: %d \n", output_L);
-		  HAL_NVIC_SystemReset();
-
 	  }
 
-	  // Print received message
+	  //Print received message
 	  if(byteCount)
 	  {
 		  fwrite(receiveBuffer, 1, byteCount, stdout);
@@ -261,8 +221,9 @@ LOOP_START:
 		  bitCount = 7;
 	  }
 
-
   }
+  /* USER CODE END WHILE */
+  /* USER CODE BEGIN 3 */
   /* USER CODE END 3 */
 }
 
@@ -436,7 +397,7 @@ static void MX_TIM8_Init(void)
   {
     Error_Handler();
   }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim8, &sMasterConfig) != HAL_OK)
   {
