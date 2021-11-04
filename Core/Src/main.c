@@ -39,7 +39,7 @@ enum state { BUSY, IDLE, COLLISION } currentState;
 #define USE_HAL_TIM_REGISTER_CALLBACKS 1
 #define F_CPU 42000000UL
 #define HEADER_LEN 6
-#define CRC_POLY 0b11100000
+#define CRC_POLY 0x07
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -143,7 +143,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 
 uint8_t gencrc(uint8_t *data, size_t len)
 {
-    uint8_t crc = data[0];
+    uint8_t crc = 0;
     size_t i, j;
     for (i = 0; i < len; i++) {
         crc ^= data[i];
@@ -169,8 +169,7 @@ int sendData(int bytes){
 	messageBuffer[3] = MANCHESTER(0x01); //destination
 	messageBuffer[4] = MANCHESTER(bytes); //length
 	messageBuffer[5] = MANCHESTER(0x01); //crc flag
-	messageBuffer[HEADER_LEN+bytes] = MANCHESTER(gencrc(buffer,bytes+1)); //crc flag
-
+	messageBuffer[HEADER_LEN+bytes] = MANCHESTER(gencrc(buffer,bytes)); //crc flag
 	for (int i = 0; i < bytes;i++){
 	  output[i] = MANCHESTER(buffer[i]);
 	}
