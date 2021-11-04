@@ -57,14 +57,14 @@ enum state { BUSY, IDLE, COLLISION } currentState;
 
 #define BUSY_S \
 		currentState = BUSY; \
-		GPIOB->BSRR |= GPIO_PIN_14 & ((GPIO_PIN_13 & GPIO_PIN_15)<<16UL)
+		GPIOB->BSRR |= GPIO_PIN_14 | ((uint32_t)(GPIO_PIN_13 | GPIO_PIN_15)<<16UL)
 #define IDLE_S \
 		currentState = IDLE; \
-		GPIOB->BSRR |= GPIO_PIN_15 & ((GPIO_PIN_13 & GPIO_PIN_14)<<16UL); \
+		GPIOB->BSRR |= GPIO_PIN_15 | ((uint32_t)(GPIO_PIN_13 | GPIO_PIN_14)<<16UL); \
 		bitCount = 7; byteCount = 0
 #define COLLISION_S \
 		currentState = COLLISION; \
-		GPIOB->BSRR |= GPIO_PIN_13 & ((GPIO_PIN_14 & GPIO_PIN_15)<<16UL)
+		GPIOB->BSRR |= GPIO_PIN_13 | ((uint32_t)(GPIO_PIN_14 | GPIO_PIN_15)<<16UL)
 
 /* USER CODE END PM */
 
@@ -76,7 +76,7 @@ TIM_HandleTypeDef htim8;
 /* USER CODE BEGIN PV */
 char buffer[256] ;
 uint16_t output[256];
-uint8_t receiveBuffer[30];
+uint8_t receiveBuffer[256];
 unsigned int byteCount = 0;
 int bitCount = 7;
 /* USER CODE END PV */
@@ -147,12 +147,14 @@ void sendData(int bytes){
 		for (int j = 15; j >= 0; j--){
 			if (currentState == COLLISION)
 				return;
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, (output[i] & 1<<j)? GPIO_PIN_SET:GPIO_PIN_RESET);
+			GPIOC->BSRR = (output[i] & 1<<j)? GPIO_PIN_8:(uint32_t)GPIO_PIN_8<<16U;
 			TIM1->CNT = 0;
 			TIM8->SR &= ~TIM_SR_UIF;
 			while(!(TIM8->SR & TIM_SR_UIF));
 		}
 	}
+	GPIOC->BSRR |= GPIO_PIN_8;
+
 }
 
 
@@ -207,8 +209,10 @@ int main(void)
 	  if(!uart_isempty())
 	  {
 		  c = uart_getc();
-		  if(c == '\r')
+		  if(c == '\r'){
 			  sendData(readCount);
+			  readCount = 0;
+		  }
 		  else
 			  buffer[readCount++] = c;
 	  }
