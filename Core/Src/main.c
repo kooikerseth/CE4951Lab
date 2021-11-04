@@ -38,11 +38,13 @@ enum state { BUSY, IDLE, COLLISION } currentState;
 /* USER CODE BEGIN PD */
 #define USE_HAL_TIM_REGISTER_CALLBACKS 1
 #define F_CPU 42000000UL
-
+#define HEADER_LEN 6
+#define CRC_POLY 0b11100000
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
+
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
   (byte & 0x80 ? '1' : '0'), \
@@ -54,6 +56,15 @@ enum state { BUSY, IDLE, COLLISION } currentState;
   (byte & 0x02 ? '1' : '0'), \
   (byte & 0x01 ? '1' : '0')
 
+#define MANCHESTER(number) \
+	((number & 0b1<<0)? 0b01<<0  : 0b10<<0  )|\
+    ((number & 0b1<<1)? 0b01<<2  : 0b10<<2  )|\
+    ((number & 0b1<<2)? 0b01<<4  : 0b10<<4  )|\
+    ((number & 0b1<<3)? 0b01<<6  : 0b10<<6  )|\
+    ((number & 0b1<<4)? 0b01<<8  : 0b10<<8  )|\
+    ((number & 0b1<<5)? 0b01<<10 : 0b10<<10 )|\
+    ((number & 0b1<<6)? 0b01<<12 : 0b10<<12 )|\
+    ((number & 0b1<<7)? 0b01<<14 : 0b10<<14 )\
 
 #define BUSY_S \
 		currentState = BUSY; \
@@ -74,11 +85,13 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim8;
 
 /* USER CODE BEGIN PV */
-char buffer[256] ;
-uint16_t output[256];
+uint8_t buffer[256] ;
+uint16_t messageBuffer[HEADER_LEN+256+1];
+uint16_t * output = messageBuffer + HEADER_LEN;
 uint8_t receiveBuffer[256];
 unsigned int byteCount = 0;
 int bitCount = 7;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -128,33 +141,57 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	}
 }
 
-void sendData(int bytes){
+uint8_t gencrc(uint8_t *data, size_t len)
+{
+    uint8_t crc = data[0];
+    size_t i, j;
+    for (i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (j = 0; j < 8; j++) {
+            if ((crc & 0x80) != 0)
+                crc = (uint8_t)((crc << 1) ^ CRC_POLY);
+            else
+                crc <<= 1;
+        }
+    }
+    return crc;
+}
+
+int sendData(int bytes){
 	//send data
 	buffer[bytes] = 0;
+
+	//headers
+
+	messageBuffer[0] = MANCHESTER(0x55); //preamble
+	messageBuffer[1] = MANCHESTER(0x01); //version
+	messageBuffer[2] = MANCHESTER(0x01); //source
+	messageBuffer[3] = MANCHESTER(0x01); //destination
+	messageBuffer[4] = MANCHESTER(bytes); //length
+	messageBuffer[5] = MANCHESTER(0x01); //crc flag
+	messageBuffer[HEADER_LEN+bytes] = MANCHESTER(gencrc(buffer,bytes+1)); //crc flag
+
 	for (int i = 0; i < bytes;i++){
-	  output[i] = 0;
-	  for (int j = 0; j < 8; j++){
-		  if (buffer[i] & 0b1<<j)
-			  output[i] |= 0b01<<((j*2));
-		  else
-			  output[i] |= 0b10<<((j*2));
-	  }
+	  output[i] = MANCHESTER(buffer[i]);
 	}
 
 	while (currentState == COLLISION || currentState == BUSY);
 	BUSY_S;
-	for (int i = 0; i < bytes;i++){
+	for (int i = 0; i < bytes+HEADER_LEN+1;i++){
 		for (int j = 15; j >= 0; j--){
-			if (currentState == COLLISION)
-				return;
-			GPIOC->BSRR = (output[i] & 1<<j)? GPIO_PIN_8:(uint32_t)GPIO_PIN_8<<16U;
+			if (currentState == COLLISION){
+				return -1;
+			}
+			GPIOC->BSRR = (messageBuffer[i] & 1<<j)? GPIO_PIN_8:(uint32_t)GPIO_PIN_8<<16U;
 			TIM1->CNT = 0;
 			TIM8->SR &= ~TIM_SR_UIF;
 			while(!(TIM8->SR & TIM_SR_UIF));
 		}
 	}
+
 	GPIOC->BSRR |= GPIO_PIN_8;
 
+	return 0;
 }
 
 
@@ -210,7 +247,12 @@ int main(void)
 	  {
 		  c = uart_getc();
 		  if(c == '\r'){
-			  sendData(readCount);
+			  while (1){
+				  if (sendData(readCount) == 0)
+					  break;
+				  TIM8->SR &= ~TIM_SR_UIF;
+				  while(!(TIM8->SR & TIM_SR_UIF));
+			  }
 			  readCount = 0;
 		  }
 		  else
