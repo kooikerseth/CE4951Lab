@@ -44,7 +44,7 @@ enum state { BUSY, IDLE, COLLISION } currentState;
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define WAIT_MAX_N 128.0
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
   (byte & 0x80 ? '1' : '0'), \
@@ -261,8 +261,12 @@ int main(void)
 			  while (1){
 				  if (sendData(readCount) == 0)
 					  break;
-				  TIM8->SR &= ~TIM_SR_UIF;
-				  while(!(TIM8->SR & TIM_SR_UIF));
+				  // random value between 0 and WAIT_MAX_N
+				  double wait = (rand()%WAIT_MAX_N)/WAIT_MAX_N;
+
+				  TIM1->SR &= ~TIM_SR_UIF;
+				  TIM1->CNT= (uint32_t)(TIM1->ARR * wait)*(0.9);
+				  while(!(TIM1->SR & TIM_SR_UIF));
 			  }
 			  readCount = 0;
 		  }
@@ -273,7 +277,24 @@ int main(void)
 	  //Print received message
 	  if(byteCount)
 	  {
-		  fwrite(receiveBuffer, 1, byteCount, stdout);
+		  printf("\n\nMESSAGE RECIEVED:\n");
+		  printf("\tPreamble:\t0x%02x\n",receiveBuffer[0]);
+		  printf("\tVersion:\t0x%02x\n",receiveBuffer[1]);
+		  printf("\tSource:\t\t0x%02x\n",receiveBuffer[2]);
+		  printf("\tDestination:\t0x%02x\n",receiveBuffer[3]);
+		  printf("\tLength:\t\t0x%02x\n",receiveBuffer[4]);
+		  printf("\tCRC Flag:\t0x%02x\n",receiveBuffer[5]);
+		  printf("\tCRC VAL:\t0x%02x",receiveBuffer[byteCount-1]);
+		  if (crc(receiveBuffer+HEADER_LEN,byteCount-HEADER_LEN) == 0){
+			  printf(" - success\n");
+		  }else {
+			  printf(" - fail\n");
+		  }
+
+		  printf("\tMESSAGE:\t");
+		  fwrite(receiveBuffer+HEADER_LEN, 1, byteCount-HEADER_LEN-1, stdout);
+		  printf("\n\n");
+
 		  byteCount = 0;
 		  bitCount = 7;
 	  }
