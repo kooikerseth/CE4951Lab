@@ -283,7 +283,7 @@ int main(void)
 	  if(!uart_isempty())
 	  {
 		  c = uart_getc();
-		  if(c == '\r'){
+		  if(c == '\r' || c == '\n'){
 			  while (1){
 				  if (sendData(readCount) == 0)
 					  break;
