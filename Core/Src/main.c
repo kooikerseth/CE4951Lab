@@ -177,7 +177,7 @@ int sendData(int bytes){
 
 	messageBuffer[0] = MANCHESTER(0x55); //preamble
 	messageBuffer[1] = MANCHESTER(0x01); //version
-	messageBuffer[2] = MANCHESTER(0x01); //source
+	messageBuffer[2] = MANCHESTER(0x16); //source
 	messageBuffer[3] = MANCHESTER(0x01); //destination
 	messageBuffer[4] = MANCHESTER(bytes); //length
 	messageBuffer[5] = MANCHESTER(0x01); //crc flag
@@ -203,6 +203,32 @@ int sendData(int bytes){
 	GPIOC->BSRR |= GPIO_PIN_8;
 
 	return 0;
+}
+
+void printMesage(void){
+	  printf("\n\nMESSAGE RECIEVED:\n");
+	  printf("\tPreamble:\t0x%02x\n",receiveBuffer[0]);
+	  printf("\tVersion:\t0x%02x\n",receiveBuffer[1]);
+	  printf("\tSource:\t\t0x%02x\n",receiveBuffer[2]);
+
+	  printf("\tDestination:\t0x%02x",receiveBuffer[3]);
+	  if (receiveBuffer[3] == 0x14)
+		  printf(" - accepted");
+	  else
+		  printf(" - rejected");
+
+	  printf("\tLength:\t\t0x%02x\n",receiveBuffer[4]);
+	  printf("\tCRC Flag:\t0x%02x\n",receiveBuffer[5]);
+	  printf("\tCRC VAL:\t0x%02x",receiveBuffer[byteCount-1]);
+
+	  if (crc(receiveBuffer+HEADER_LEN,byteCount-HEADER_LEN) == 0)
+		  printf(" - success\n");
+	  else
+		  printf(" - fail\n");
+
+	  printf("\tMESSAGE:\t");
+	  fwrite(receiveBuffer+HEADER_LEN, 1, byteCount-HEADER_LEN-1, stdout);
+	  printf("\n\n");
 }
 
 
@@ -275,26 +301,9 @@ int main(void)
 	  }
 
 	  //Print received message
-	  if(byteCount)
+	  if(byteCount > HEADER_LEN+2)
 	  {
-		  printf("\n\nMESSAGE RECIEVED:\n");
-		  printf("\tPreamble:\t0x%02x\n",receiveBuffer[0]);
-		  printf("\tVersion:\t0x%02x\n",receiveBuffer[1]);
-		  printf("\tSource:\t\t0x%02x\n",receiveBuffer[2]);
-		  printf("\tDestination:\t0x%02x\n",receiveBuffer[3]);
-		  printf("\tLength:\t\t0x%02x\n",receiveBuffer[4]);
-		  printf("\tCRC Flag:\t0x%02x\n",receiveBuffer[5]);
-		  printf("\tCRC VAL:\t0x%02x",receiveBuffer[byteCount-1]);
-		  if (crc(receiveBuffer+HEADER_LEN,byteCount-HEADER_LEN) == 0){
-			  printf(" - success\n");
-		  }else {
-			  printf(" - fail\n");
-		  }
-
-		  printf("\tMESSAGE:\t");
-		  fwrite(receiveBuffer+HEADER_LEN, 1, byteCount-HEADER_LEN-1, stdout);
-		  printf("\n\n");
-
+		  printMessage();
 		  byteCount = 0;
 		  bitCount = 7;
 	  }
