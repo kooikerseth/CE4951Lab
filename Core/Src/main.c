@@ -86,10 +86,10 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim8;
 
 /* USER CODE BEGIN PV */
-uint8_t buffer[256] ;
+uint8_t buffer[HEADER_LEN+256+1] ;
 uint16_t messageBuffer[HEADER_LEN+256+1];
 uint16_t * output = messageBuffer + HEADER_LEN;
-uint8_t receiveBuffer[256];
+uint8_t receiveBuffer[HEADER_LEN+256+1];
 unsigned int byteCount = 0;
 int bitCount = 7;
 static unsigned char const crc8x_table[] = {
@@ -151,7 +151,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 				byteCount++;
 				bitCount = 7;
 			}
-			if(byteCount == 30)
+			if(byteCount == HEADER_LEN+256+1)
 				byteCount = 0;
 
 			BUSY_S;
@@ -179,7 +179,7 @@ int sendData(int bytes){
 	messageBuffer[0] = MANCHESTER(0x55); //preamble
 	messageBuffer[1] = MANCHESTER(0x01); //version
 	messageBuffer[2] = MANCHESTER(0x16); //source
-	messageBuffer[3] = MANCHESTER(0x01); //destination
+	messageBuffer[3] = MANCHESTER(0x15); //destination
 	messageBuffer[4] = MANCHESTER(bytes); //length
 	messageBuffer[5] = MANCHESTER(CRCENABLE); //crc flag
 	if (CRCENABLE)
@@ -216,7 +216,7 @@ void printMessage(void){
 	  printf("\tSource:\t\t0x%02x\n",receiveBuffer[2]);
 
 	  printf("\tDestination:\t0x%02x",receiveBuffer[3]);
-	  if (receiveBuffer[3] == 0x14)
+	  if (receiveBuffer[3] == 0x16 || receiveBuffer[3] == 0x16)
 		  printf(" - accepted\n");
 	  else
 		  printf(" - rejected\n");
