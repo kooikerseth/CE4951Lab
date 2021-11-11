@@ -40,6 +40,7 @@ enum state { BUSY, IDLE, COLLISION } currentState;
 #define F_CPU 42000000UL
 #define HEADER_LEN 6
 #define CRC_POLY 0x07
+#define CRCENABLE 0x01
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -180,11 +181,11 @@ int sendData(int bytes){
 	messageBuffer[2] = MANCHESTER(0x16); //source
 	messageBuffer[3] = MANCHESTER(0x01); //destination
 	messageBuffer[4] = MANCHESTER(bytes); //length
-	messageBuffer[5] = MANCHESTER(0x00); //crc flag
-	if (messageBuffer[5] == MANCHESTER(0))
-		messageBuffer[HEADER_LEN+bytes] = MANCHESTER(0xAA); //crc flag
-	else
+	messageBuffer[5] = MANCHESTER(CRCENABLE); //crc flag
+	if (CRCENABLE)
 		messageBuffer[HEADER_LEN+bytes] = MANCHESTER(crc(buffer,bytes)); //crc flag
+	else
+		messageBuffer[HEADER_LEN+bytes] = MANCHESTER(0xAA); //crc flag
 	for (int i = 0; i < bytes;i++){
 	  output[i] = MANCHESTER(buffer[i]);
 	}
