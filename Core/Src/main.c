@@ -181,7 +181,10 @@ int sendData(int bytes){
 	messageBuffer[3] = MANCHESTER(0x01); //destination
 	messageBuffer[4] = MANCHESTER(bytes); //length
 	messageBuffer[5] = MANCHESTER(0x01); //crc flag
-	messageBuffer[HEADER_LEN+bytes] = MANCHESTER(crc(buffer,bytes)); //crc flag
+	if (messageBuffer[5] == 0)
+		messageBuffer[HEADER_LEN+bytes] = MANCHESTER(0xAA); //crc flag
+	else
+		messageBuffer[HEADER_LEN+bytes] = MANCHESTER(crc(buffer,bytes)); //crc flag
 	for (int i = 0; i < bytes;i++){
 	  output[i] = MANCHESTER(buffer[i]);
 	}
@@ -205,7 +208,7 @@ int sendData(int bytes){
 	return 0;
 }
 
-void printMesage(void){
+void printMessage(void){
 	  printf("\n\nMESSAGE RECIEVED:\n");
 	  printf("\tPreamble:\t0x%02x\n",receiveBuffer[0]);
 	  printf("\tVersion:\t0x%02x\n",receiveBuffer[1]);
@@ -213,21 +216,29 @@ void printMesage(void){
 
 	  printf("\tDestination:\t0x%02x",receiveBuffer[3]);
 	  if (receiveBuffer[3] == 0x14)
-		  printf(" - accepted");
+		  printf(" - accepted\n");
 	  else
-		  printf(" - rejected");
+		  printf(" - rejected\n");
 
 	  printf("\tLength:\t\t0x%02x\n",receiveBuffer[4]);
 	  printf("\tCRC Flag:\t0x%02x\n",receiveBuffer[5]);
-	  printf("\tCRC VAL:\t0x%02x",receiveBuffer[byteCount-1]);
-
-	  if (crc(receiveBuffer+HEADER_LEN,byteCount-HEADER_LEN) == 0)
-		  printf(" - success\n");
-	  else
-		  printf(" - fail\n");
+	  if (receiveBuffer[5] == 1){
+		  printf("\tCRC VAL:\t0x%02x",receiveBuffer[byteCount-1]);
+		  if (crc(receiveBuffer+HEADER_LEN,receiveBuffer[4]+1) == 0)
+			  printf(" - success\n");
+		  else
+			  printf(" - fail\n");
+	  }
+	  else {
+		  printf("\tCRC VAL:\t0x%02x",receiveBuffer[byteCount-1]);
+		  if (receiveBuffer[byteCount-1]== 0xAA)
+			  printf(" - success\n");
+		  else
+			  printf(" - fail\n");
+	  }
 
 	  printf("\tMESSAGE:\t");
-	  fwrite(receiveBuffer+HEADER_LEN, 1, byteCount-HEADER_LEN-1, stdout);
+	  fwrite(receiveBuffer+HEADER_LEN, 1, receiveBuffer[4], stdout);
 	  printf("\n\n");
 }
 
@@ -288,10 +299,10 @@ int main(void)
 				  if (sendData(readCount) == 0)
 					  break;
 				  // random value between 0 and WAIT_MAX_N
-				  double wait = (rand()%WAIT_MAX_N)/WAIT_MAX_N;
+				  double wait = rand()*(0.9);
 
 				  TIM1->SR &= ~TIM_SR_UIF;
-				  TIM1->CNT= (uint32_t)(TIM1->ARR * wait)*(0.9);
+				  TIM1->CNT= (uint32_t)(TIM1->ARR * wait);
 				  while(!(TIM1->SR & TIM_SR_UIF));
 			  }
 			  readCount = 0;
@@ -301,16 +312,18 @@ int main(void)
 	  }
 
 	  //Print received message
-	  if(byteCount > HEADER_LEN+2)
+	  if(byteCount > HEADER_LEN+receiveBuffer[4])
 	  {
+		  //while(currentState != BUSY);
 		  printMessage();
 		  byteCount = 0;
 		  bitCount = 7;
 	  }
 
   }
-  /* USER CODE END WHILE */
-  /* USER CODE BEGIN 3 */
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
   /* USER CODE END 3 */
 }
 
@@ -524,7 +537,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : PC8 */
   GPIO_InitStruct.Pin = GPIO_PIN_8;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
