@@ -180,8 +180,8 @@ int sendData(int bytes){
 	messageBuffer[2] = MANCHESTER(0x16); //source
 	messageBuffer[3] = MANCHESTER(0x01); //destination
 	messageBuffer[4] = MANCHESTER(bytes); //length
-	messageBuffer[5] = MANCHESTER(0x01); //crc flag
-	if (messageBuffer[5] == 0)
+	messageBuffer[5] = MANCHESTER(0x00); //crc flag
+	if (messageBuffer[5] == MANCHESTER(0))
 		messageBuffer[HEADER_LEN+bytes] = MANCHESTER(0xAA); //crc flag
 	else
 		messageBuffer[HEADER_LEN+bytes] = MANCHESTER(crc(buffer,bytes)); //crc flag
@@ -231,10 +231,7 @@ void printMessage(void){
 	  }
 	  else {
 		  printf("\tCRC VAL:\t0x%02x",receiveBuffer[byteCount-1]);
-		  if (receiveBuffer[byteCount-1]== 0xAA)
-			  printf(" - success\n");
-		  else
-			  printf(" - fail\n");
+		  printf(" - ignore\n");
 	  }
 
 	  printf("\tMESSAGE:\t");
